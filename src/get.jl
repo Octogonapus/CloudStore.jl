@@ -101,7 +101,7 @@ function getObjectImpl(x::AbstractStore, key::String, out::ResponseBodyType=noth
     batchSize::Int=defaultBatchSize(),
     allowMultipart::Bool=true,
     objectMaxSize::Union{Int, Nothing}=out isa AbstractVector{UInt8} ? length(out) : nothing,
-    decompress::Bool=false,
+    decompress_cloudstore::Bool=false,
     zlibng::Bool=false,
     headers=HTTP2.Headers(),
     lograte::Bool=false, kw...)
@@ -151,7 +151,7 @@ function getObjectImpl(x::AbstractStore, key::String, out::ResponseBodyType=noth
                 rethrow(e)
             end
         elseif out isa String
-            if decompress
+            if decompress_cloudstore
                 body = decompressorstream(zlibng)(open(out, "w"))
                 resp = getObject(x, url, headers; response_stream=body, kw...)
             else
@@ -159,7 +159,7 @@ function getObjectImpl(x::AbstractStore, key::String, out::ResponseBodyType=noth
                 resp = getObject(x, url, headers; response_stream=body, kw...)
             end
         else
-            if decompress
+            if decompress_cloudstore
                 body = decompressorstream(zlibng)(out)
                 resp = getObject(x, url, headers; response_stream=body, kw...)
             else
@@ -200,10 +200,10 @@ function getObjectImpl(x::AbstractStore, key::String, out::ResponseBodyType=noth
         res = out
         body = view(out, 1:contentLength)
     elseif out isa String
-        body = decompress ? decompressorstream(zlibng)(open(out, "w")) : open(out, "w")
+        body = decompress_cloudstore ? decompressorstream(zlibng)(open(out, "w")) : open(out, "w")
         buffers = BufferBatch(batchSize, partSize)
     else
-        body = decompress ? decompressorstream(zlibng)(out) : out
+        body = decompress_cloudstore ? decompressorstream(zlibng)(out) : out
         buffers = BufferBatch(batchSize, partSize)
     end
 
@@ -239,11 +239,11 @@ function getObjectImpl(x::AbstractStore, key::String, out::ResponseBodyType=noth
 
 @label done
     if out === nothing
-        if decompress
+        if decompress_cloudstore
             res = transcode(decompressor(zlibng), res)
         end
     elseif out isa AbstractVector{UInt8}
-        if decompress
+        if decompress_cloudstore
             # make a copy of a view of just the compressed bytes in out, then decompress into out
             res = transcode(decompressor(zlibng), copy(view(out, 1:nbytes[])), out)
         else
